@@ -23,7 +23,7 @@ Pull a general model (not domain-specific):
 ollama pull llama3.1:8b
 ```
 
-Set the same name in the orchestrator job env `OLLAMA_MODEL` (default `llama3.1:8b`).
+Set the same name in the orchestrator job env `LLM_MODEL` (or alias `OLLAMA_MODEL`; default `llama3.1:8b`).
 
 ## Listen address (Docker → host)
 
@@ -39,9 +39,9 @@ sudo systemctl daemon-reload
 sudo systemctl restart ollama
 ```
 
-Restrict with a host firewall if the machine is on an untrusted network (allow `11434/tcp` only from Docker bridge / localhost).
+Restrict with a host firewall if the machine is on an untrusted network (allow `11434/tcp` only from Docker bridge / localhost). **Do not expose Ollama on untrusted interfaces without a firewall.**
 
-Orchestrator job default: `OLLAMA_HOST=http://172.17.0.1:11434` (docker0 gateway to the host). If your docker0 CIDR differs, adjust:
+Orchestrator job default: `LLM_BASE_URL=http://172.17.0.1:11434` (docker0 gateway to the host; `OLLAMA_HOST` still accepted as an alias). If your docker0 CIDR differs, adjust:
 
 ```bash
 ip -4 addr show docker0

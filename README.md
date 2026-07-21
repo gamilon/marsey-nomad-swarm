@@ -1,21 +1,20 @@
 # marsey-nomad-swarm
 
-Lab agent swarm on bare-metal **Nomad CE** with host **Ollama** (no paid model APIs).
+Agent swarm control plane. **Lab path:** bare-metal Nomad CE + host Ollama. Artifacts are shaped for Nomad Enterprise namespaces/ACLs when you have that cluster (external Terraform — not in this repo).
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| [`lab/nomad/`](lab/nomad/) | Single-node Nomad config, systemd unit, ACL policies |
+| [`lab/nomad/`](lab/nomad/) | Local Nomad CE config, systemd unit, ACL policies |
 | [`lab/ollama/`](lab/ollama/) | Host Ollama install and Docker→host wiring |
-| [`orchestrator/`](orchestrator/) | TypeScript control plane (planner → workers via Ollama) |
-| [`nomad-jobs/`](nomad-jobs/) | Nomad jobspec for the orchestrator |
-| [`docs/architecture.md`](docs/architecture.md) | Swarm roles and runtime layout |
+| [`orchestrator/`](orchestrator/) | TypeScript control plane (planner → workers via `LlmClient`) |
+| [`nomad-jobs/`](nomad-jobs/) | Orchestrator jobspec + optional `swarm` namespace/ACLs |
+| [`docs/architecture.md`](docs/architecture.md) | Roles, API, security roadmap, provider env |
+| [`scripts/deploy.sh`](scripts/deploy.sh) | Build local image + `nomad job run` (lab) |
 
 ## Quick path
 
 1. Install Nomad — [`lab/nomad/README.md`](lab/nomad/README.md)
 2. Install Ollama — [`lab/ollama/README.md`](lab/ollama/README.md)
-3. Build & run orchestrator — [`nomad-jobs/README.md`](nomad-jobs/README.md)
-
-Nomad cluster provisioning on AWS (Terraform/HVD) is intentionally out of this repo.
+3. Build & run orchestrator — [`nomad-jobs/README.md`](nomad-jobs/README.md) or `./scripts/deploy.sh`

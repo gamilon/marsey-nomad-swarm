@@ -1,6 +1,6 @@
 # Lab Nomad CE (single node, bare metal)
 
-Minimal Nomad Community Edition on a **bare-metal** lab host: one machine runs both **server** and **client** (`bootstrap_expect = 1`). Runs as a dedicated `nomad` user (not root). TLS required (self-signed CA + cert).
+Local **test cluster** for this repo: Nomad Community Edition on a **bare-metal** lab host — one machine runs both **server** and **client** (`bootstrap_expect = 1`). Runs as a dedicated `nomad` user (not root). TLS required (self-signed CA + cert). Production Nomad Enterprise bootstrap is out of this repo.
 
 ## Prerequisites
 
