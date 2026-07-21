@@ -1,13 +1,14 @@
-export interface ChatMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
+import type { ChatMessage, LlmClient } from "./types.js";
 
-export class OllamaClient {
+export class OllamaClient implements LlmClient {
+  readonly modelId: string;
+
   constructor(
     private readonly baseUrl: string,
-    private readonly model: string,
-  ) {}
+    model: string,
+  ) {
+    this.modelId = model;
+  }
 
   async chat(messages: ChatMessage[]): Promise<string> {
     const url = `${this.baseUrl.replace(/\/$/, "")}/api/chat`;
@@ -15,7 +16,7 @@ export class OllamaClient {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: this.model,
+        model: this.modelId,
         messages,
         stream: false,
         format: "json",
@@ -24,7 +25,7 @@ export class OllamaClient {
 
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Ollama chat failed (${res.status}): ${body}`);
+      throw new Error(`LLM chat failed (${res.status}): ${body}`);
     }
 
     const data = (await res.json()) as {
@@ -32,7 +33,7 @@ export class OllamaClient {
     };
     const content = data.message?.content;
     if (!content) {
-      throw new Error("Ollama returned empty message content");
+      throw new Error("LLM returned empty message content");
     }
     return content;
   }

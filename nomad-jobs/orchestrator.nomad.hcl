@@ -1,4 +1,6 @@
 job "orchestrator" {
+  # Lab CE default: no namespace (default). For optional swarm namespace, see
+  # nomad-jobs/README.md and set: namespace = "swarm"
   datacenters = ["lab"]
   type        = "service"
 
@@ -36,9 +38,12 @@ job "orchestrator" {
       env {
         PORT         = "8080"
         DATA_DIR     = "/data/runs"
+        # Prefer LLM_*; OLLAMA_* aliases still work in the app.
+        LLM_PROVIDER = "ollama"
         # Docker bridge gateway to the host where Ollama listens (see lab/ollama/README.md).
-        OLLAMA_HOST  = "http://172.17.0.1:11434"
-        OLLAMA_MODEL = "llama3.1:8b"
+        LLM_BASE_URL = "http://172.17.0.1:11434"
+        LLM_MODEL    = "llama3.1:8b"
+        MAX_CONCURRENT_RUNS = "2"
       }
 
       resources {
@@ -51,9 +56,10 @@ job "orchestrator" {
         port     = "http"
         provider = "nomad"
 
+        # Liveness only — LLM readiness is /readyz (or /health).
         check {
           type     = "http"
-          path     = "/health"
+          path     = "/livez"
           interval = "15s"
           timeout  = "5s"
         }

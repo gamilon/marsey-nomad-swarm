@@ -1,33 +1,39 @@
 import { randomUUID } from "node:crypto";
-import type { OllamaClient } from "./ollama.js";
+import { extractJson } from "./json.js";
+import type { LlmClient } from "./llm/types.js";
 import type { RunStore } from "./store.js";
 import type { Handoff, Run, Task } from "./types.js";
+
+export class CapacityError extends Error {
+  constructor(message = "too many concurrent runs") {
+    super(message);
+    this.name = "CapacityError";
+  }
+}
 
 function now(): string {
   return new Date().toISOString();
 }
 
-function extractJson(text: string): unknown {
-  const trimmed = text.trim();
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
-    if (start >= 0 && end > start) {
-      return JSON.parse(trimmed.slice(start, end + 1));
-    }
-    throw new Error(`Could not parse JSON from model output: ${trimmed.slice(0, 200)}`);
-  }
-}
-
 export class Runner {
+  private active = 0;
+
   constructor(
     private readonly store: RunStore,
-    private readonly ollama: OllamaClient,
+    private readonly llm: LlmClient,
+    private readonly maxConcurrent: number = 2,
   ) {}
 
+  get activeRuns(): number {
+    return this.active;
+  }
+
   async create(goal: string, metadata: Record<string, unknown> = {}): Promise<Run> {
+    if (this.active >= this.maxConcurrent) {
+      throw new CapacityError();
+    }
+    this.active += 1;
+
     const run: Run = {
       id: randomUUID(),
       goal,
@@ -38,8 +44,17 @@ export class Runner {
       plan: [],
       handoffs: [],
     };
-    await this.store.save(run);
-    void this.execute(run.id);
+
+    try {
+      await this.store.save(run);
+    } catch (err) {
+      this.active -= 1;
+      throw err;
+    }
+
+    void this.execute(run.id).finally(() => {
+      this.active -= 1;
+    });
     return run;
   }
 
@@ -54,7 +69,7 @@ export class Runner {
       run.updatedAt = now();
       await this.store.save(run);
 
-      const planRaw = await this.ollama.chat([
+      const planRaw = await this.llm.chat([
         {
           role: "system",
           content:
@@ -80,7 +95,7 @@ export class Runner {
 
       const handoffs: Handoff[] = [];
       for (const task of tasks) {
-        const workerRaw = await this.ollama.chat([
+        const workerRaw = await this.llm.chat([
           {
             role: "system",
             content:
