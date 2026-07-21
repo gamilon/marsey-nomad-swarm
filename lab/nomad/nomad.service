@@ -1,0 +1,29 @@
+[Unit]
+Description=HashiCorp Nomad (bare-metal lab)
+Documentation=https://developer.hashicorp.com/nomad/docs
+Wants=network-online.target
+After=network-online.target docker.service
+Wants=docker.service
+
+[Service]
+Type=notify
+User=nomad
+Group=nomad
+# Access to /var/run/docker.sock (docker group ≈ root — lab tradeoff)
+SupplementaryGroups=docker
+ExecStart=/usr/local/bin/nomad agent -config=/etc/nomad.d/nomad.hcl
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+LimitNPROC=infinity
+TasksMax=infinity
+OOMScoreAdjust=-1000
+
+CapabilityBoundingSet=CAP_IPC_LOCK CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_IPC_LOCK CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
