@@ -18,3 +18,7 @@ Agent swarm control plane. **Lab path:** bare-metal Nomad CE + host Ollama. Arti
 1. Install Nomad — [`lab/nomad/README.md`](lab/nomad/README.md)
 2. Install Ollama — [`lab/ollama/README.md`](lab/ollama/README.md)
 3. Build & run orchestrator — [`nomad-jobs/README.md`](nomad-jobs/README.md) or `./scripts/deploy.sh`
+
+## CI
+
+GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on pushes and PRs to `main`: `npm ci` / `npm test` / `npm run build` for the orchestrator, plus a Docker image build.
