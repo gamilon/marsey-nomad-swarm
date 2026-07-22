@@ -6,6 +6,7 @@ import {
   readJsonBody,
 } from "./http.js";
 import { createLlmClient, resolveLlmConfig } from "./llm/index.js";
+import { logError, logInfo } from "./log.js";
 import { CancelNotAllowedError, CapacityError, Runner } from "./runner.js";
 import { RunStore } from "./store.js";
 
@@ -27,12 +28,22 @@ function send(res: http.ServerResponse, status: number, body: unknown): void {
   res.end(payload);
 }
 
+function shouldLogHttp(pathname: string): boolean {
+  return pathname !== "/livez" && pathname !== "/readyz" && pathname !== "/health";
+}
+
 const server = http.createServer(async (req, res) => {
+  const started = Date.now();
+  let pathname = "/";
+  let statusCode = 500;
+
   try {
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+    pathname = url.pathname;
 
     if (req.method === "GET" && url.pathname === "/livez") {
-      send(res, 200, { status: "ok" });
+      statusCode = 200;
+      send(res, statusCode, { status: "ok" });
       return;
     }
 
@@ -41,7 +52,8 @@ const server = http.createServer(async (req, res) => {
       (url.pathname === "/readyz" || url.pathname === "/health")
     ) {
       const llmOk = await llm.healthy();
-      send(res, llmOk ? 200 : 503, {
+      statusCode = llmOk ? 200 : 503;
+      send(res, statusCode, {
         status: llmOk ? "ok" : "degraded",
         llm: llmOk,
         provider: llmConfig.provider,
@@ -56,11 +68,13 @@ const server = http.createServer(async (req, res) => {
       const limitRaw = url.searchParams.get("limit");
       const limit = limitRaw ? Number(limitRaw) : 50;
       if (!Number.isFinite(limit) || limit < 1 || limit > 200) {
-        send(res, 400, { error: "limit must be between 1 and 200" });
+        statusCode = 400;
+        send(res, statusCode, { error: "limit must be between 1 and 200" });
         return;
       }
       const runs = await store.listSummaries(limit);
-      send(res, 200, { runs });
+      statusCode = 200;
+      send(res, statusCode, { runs });
       return;
     }
 
@@ -68,15 +82,18 @@ const server = http.createServer(async (req, res) => {
       const raw = await readJsonBody(req);
       const parsed = parseCreateRunBody(raw);
       if ("error" in parsed) {
-        send(res, 400, { error: parsed.error });
+        statusCode = 400;
+        send(res, statusCode, { error: parsed.error });
         return;
       }
       try {
         const run = await runner.create(parsed.goal, parsed.metadata);
-        send(res, 202, { id: run.id, status: run.status });
+        statusCode = 202;
+        send(res, statusCode, { id: run.id, status: run.status });
       } catch (err: unknown) {
         if (err instanceof CapacityError) {
-          send(res, 429, { error: "too many concurrent runs" });
+          statusCode = 429;
+          send(res, statusCode, { error: "too many concurrent runs" });
           return;
         }
         throw err;
@@ -88,16 +105,18 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && cancelMatch) {
       const id = cancelMatch[1];
       if (!isRunId(id)) {
-        send(res, 400, { error: "invalid run id" });
+        statusCode = 400;
+        send(res, statusCode, { error: "invalid run id" });
         return;
       }
       try {
         const run = await runner.cancel(id);
-        send(res, 200, { id: run.id, status: run.status });
+        statusCode = 200;
+        send(res, statusCode, { id: run.id, status: run.status });
       } catch (err: unknown) {
         if (err instanceof CancelNotAllowedError) {
-          const status = err.message === "run not found" ? 404 : 409;
-          send(res, status, { error: err.message });
+          statusCode = err.message === "run not found" ? 404 : 409;
+          send(res, statusCode, { error: err.message });
           return;
         }
         throw err;
@@ -109,39 +128,64 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && runMatch) {
       const id = runMatch[1];
       if (!isRunId(id)) {
-        send(res, 400, { error: "invalid run id" });
+        statusCode = 400;
+        send(res, statusCode, { error: "invalid run id" });
         return;
       }
       const run = await store.get(id);
       if (!run) {
-        send(res, 404, { error: "run not found" });
+        statusCode = 404;
+        send(res, statusCode, { error: "run not found" });
         return;
       }
-      send(res, 200, run);
+      statusCode = 200;
+      send(res, statusCode, run);
       return;
     }
 
-    send(res, 404, { error: "not found" });
+    statusCode = 404;
+    send(res, statusCode, { error: "not found" });
   } catch (err: unknown) {
     if (err instanceof BodyTooLargeError) {
-      send(res, 413, { error: "request body too large" });
+      statusCode = 413;
+      send(res, statusCode, { error: "request body too large" });
       return;
     }
     if (err instanceof SyntaxError) {
-      send(res, 400, { error: "invalid JSON" });
+      statusCode = 400;
+      send(res, statusCode, { error: "invalid JSON" });
       return;
     }
-    console.error("request failed", err);
-    send(res, 500, { error: "internal server error" });
+    const message = err instanceof Error ? err.message : String(err);
+    logError("http.error", {
+      method: req.method ?? "GET",
+      path: pathname,
+      error: message.slice(0, 200),
+    });
+    statusCode = 500;
+    send(res, statusCode, { error: "internal server error" });
+  } finally {
+    if (shouldLogHttp(pathname)) {
+      logInfo("http.request", {
+        method: req.method ?? "GET",
+        path: pathname,
+        status: statusCode,
+        durationMs: Date.now() - started,
+      });
+    }
   }
 });
 
 await store.init();
 server.listen(port, () => {
-  console.log(
-    `orchestrator listening on :${port} provider=${llmConfig.provider} ` +
-      `base=${llmConfig.baseUrl} model=${llmConfig.model} ` +
-      `timeoutMs=${llmConfig.timeoutMs} maxRetries=${llmConfig.maxRetries} ` +
-      `maxConcurrent=${maxConcurrent} data=${dataDir}`,
-  );
+  logInfo("startup", {
+    port,
+    provider: llmConfig.provider,
+    baseUrl: llmConfig.baseUrl,
+    model: llmConfig.model,
+    timeoutMs: llmConfig.timeoutMs,
+    maxRetries: llmConfig.maxRetries,
+    maxConcurrent,
+    dataDir,
+  });
 });

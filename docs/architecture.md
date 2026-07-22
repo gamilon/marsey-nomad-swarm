@@ -59,7 +59,27 @@ Only the Ollama adapter is implemented today; add adapters behind `createLlmClie
 
 Statuses: `pending` → `planning` → `working` → `completed` | `failed` | `cancelled`.
 
-Request bodies are size-limited; run ids must be UUIDs. The API is **unauthenticated** today — trusted network / lab LAN only. Alloc logs emit one JSON line per phase (`runId`, `phase`, optional `taskId`) without goal/handoff bodies.
+Request bodies are size-limited; run ids must be UUIDs. The API is **unauthenticated** today — trusted network / lab LAN only.
+
+### Log structure
+
+Every log line is one JSON object on stdout/stderr (Nomad alloc logs). Schema:
+
+| Field | Meaning |
+|-------|---------|
+| `ts` | ISO-8601 timestamp |
+| `level` | `debug` \| `info` \| `warn` \| `error` (`LOG_LEVEL`, default `info`) |
+| `event` | Stable event name (see below) |
+| … | Event-specific fields (never goals, handoffs, or request bodies) |
+
+| Event | When | Extra fields |
+|-------|------|----------------|
+| `startup` | Process listen | `port`, `provider`, `baseUrl`, `model`, `timeoutMs`, `maxRetries`, `maxConcurrent`, `dataDir` |
+| `http.request` | API call finished (skips `/livez`, `/readyz`, `/health`) | `method`, `path`, `status`, `durationMs` |
+| `http.error` | Unhandled handler error | `method`, `path`, `error` (truncated) |
+| `run.phase` | Run lifecycle | `runId`, `phase`, optional `taskId`, `taskCount`, `error` |
+
+Example: `nomad alloc logs <id> | jq -c 'select(.event=="run.phase")'`
 
 ## Security notes (current)
 
