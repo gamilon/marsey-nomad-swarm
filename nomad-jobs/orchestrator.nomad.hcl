@@ -20,7 +20,8 @@ job "orchestrator" {
     }
 
     task "orchestrator" {
-      driver = "docker"
+      driver         = "docker"
+      shutdown_delay = "10s"
 
       config {
         image = "swarm-orchestrator:local"
