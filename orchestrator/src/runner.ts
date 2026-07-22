@@ -26,6 +26,24 @@ function now(): string {
   return new Date().toISOString();
 }
 
+function isCancelError(
+  err: unknown,
+  signal: AbortSignal,
+  status: string,
+): boolean {
+  if (signal.aborted || status === "cancelled") {
+    return true;
+  }
+  if (err instanceof LlmAbortedError) {
+    return true;
+  }
+  if (err instanceof Error && err.name === "AbortError") {
+    return true;
+  }
+  const cause = err instanceof Error ? err.cause : undefined;
+  return cause instanceof Error && cause.name === "AbortError";
+}
+
 export class Runner {
   private active = 0;
   private readonly controllers = new Map<string, AbortController>();
@@ -89,21 +107,24 @@ export class Runner {
       throw new CancelNotAllowedError(`cannot cancel run in status ${run.status}`);
     }
 
-    const controller = this.controllers.get(id);
-    controller?.abort();
+    // Abort first so in-flight fetch rejects ASAP, then persist terminal status.
+    this.controllers.get(id)?.abort();
 
-    // If execute is between LLM calls or never started, persist cancel now.
-    // execute() will also observe abort and write cancelled if it still owns the run.
-    const latest = await this.store.get(id);
-    if (latest && CANCELABLE.has(latest.status)) {
-      latest.status = "cancelled";
-      latest.error = "cancelled by client";
-      latest.updatedAt = now();
-      await this.store.save(latest);
-      logEvent({ runId: id, phase: "cancelled" });
-      return latest;
+    run.status = "cancelled";
+    run.error = "cancelled by client";
+    run.updatedAt = now();
+    const wrote = await this.store.save(run);
+    if (!wrote) {
+      const latest = await this.store.get(id);
+      if (latest && !CANCELABLE.has(latest.status)) {
+        throw new CancelNotAllowedError(
+          `cannot cancel run in status ${latest.status}`,
+        );
+      }
+      return latest ?? run;
     }
-    return (await this.store.get(id)) ?? run;
+    logEvent({ runId: id, phase: "cancelled" });
+    return run;
   }
 
   private async execute(id: string, signal: AbortSignal): Promise<void> {
@@ -193,12 +214,7 @@ export class Runner {
       logEvent({ runId: id, phase: "completed" });
     } catch (err: unknown) {
       const latest = (await this.store.get(id)) ?? run;
-      if (
-        err instanceof LlmAbortedError ||
-        (err instanceof Error && err.name === "AbortError") ||
-        signal.aborted ||
-        latest.status === "cancelled"
-      ) {
+      if (isCancelError(err, signal, latest.status)) {
         if (latest.status !== "cancelled") {
           latest.status = "cancelled";
           latest.error = "cancelled by client";
@@ -235,6 +251,9 @@ export class Runner {
 
   private async saveIfActive(run: Run, signal: AbortSignal): Promise<void> {
     await this.ensureActive(run.id, signal);
-    await this.store.save(run);
+    const wrote = await this.store.save(run);
+    if (!wrote) {
+      throw new LlmAbortedError();
+    }
   }
 }

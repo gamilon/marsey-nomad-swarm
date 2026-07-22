@@ -4,6 +4,7 @@ import { isRunId } from "./ids.js";
 import type { Run, RunSummary } from "./types.js";
 
 const DEFAULT_LIST_LIMIT = 50;
+const TERMINAL = new Set(["completed", "failed", "cancelled"]);
 
 export class RunStore {
   constructor(private readonly dir: string) {}
@@ -19,11 +20,21 @@ export class RunStore {
     return path.join(this.dir, `${id}.json`);
   }
 
-  async save(run: Run): Promise<void> {
+  /**
+   * Persist a run. Refuses to clobber a terminal status with a non-terminal
+   * (or different terminal) update — protects cancel vs in-flight execute races.
+   * Returns false if the write was skipped.
+   */
+  async save(run: Run): Promise<boolean> {
+    const existing = await this.get(run.id);
+    if (existing && TERMINAL.has(existing.status) && existing.status !== run.status) {
+      return false;
+    }
     await writeFile(this.fileFor(run.id), JSON.stringify(run, null, 2), {
       encoding: "utf8",
       mode: 0o600,
     });
+    return true;
   }
 
   async get(id: string): Promise<Run | null> {

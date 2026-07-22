@@ -49,3 +49,41 @@ describe("RunStore.listSummaries", () => {
     }
   });
 });
+
+describe("RunStore.save", () => {
+  it("does not let in-flight updates clobber cancelled", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "swarm-save-"));
+    try {
+      const store = new RunStore(dir);
+      await store.init();
+      const id = "550e8400-e29b-41d4-a716-446655440099";
+      await store.save(
+        run({
+          id,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          status: "planning",
+        }),
+      );
+      await store.save(
+        run({
+          id,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          status: "cancelled",
+          error: "cancelled by client",
+        }),
+      );
+      const wrote = await store.save(
+        run({
+          id,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          status: "working",
+        }),
+      );
+      assert.equal(wrote, false);
+      const latest = await store.get(id);
+      assert.equal(latest?.status, "cancelled");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
