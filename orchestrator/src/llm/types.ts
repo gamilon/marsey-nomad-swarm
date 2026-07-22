@@ -3,8 +3,12 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface ChatOptions {
+  signal?: AbortSignal;
+}
+
 export interface LlmClient {
   readonly modelId: string;
-  chat(messages: ChatMessage[]): Promise<string>;
-  healthy(): Promise<boolean>;
+  chat(messages: ChatMessage[], options?: ChatOptions): Promise<string>;
+  healthy(options?: ChatOptions): Promise<boolean>;
 }

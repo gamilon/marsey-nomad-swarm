@@ -6,7 +6,7 @@ import {
   readJsonBody,
 } from "./http.js";
 import { createLlmClient, resolveLlmConfig } from "./llm/index.js";
-import { CapacityError, Runner } from "./runner.js";
+import { CancelNotAllowedError, CapacityError, Runner } from "./runner.js";
 import { RunStore } from "./store.js";
 
 const port = Number(process.env.PORT ?? "8080");
@@ -46,7 +46,21 @@ const server = http.createServer(async (req, res) => {
         llm: llmOk,
         provider: llmConfig.provider,
         model: llm.modelId,
+        activeRuns: runner.activeRuns,
+        maxConcurrentRuns: runner.maxConcurrentRuns,
       });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/v1/runs") {
+      const limitRaw = url.searchParams.get("limit");
+      const limit = limitRaw ? Number(limitRaw) : 50;
+      if (!Number.isFinite(limit) || limit < 1 || limit > 200) {
+        send(res, 400, { error: "limit must be between 1 and 200" });
+        return;
+      }
+      const runs = await store.listSummaries(limit);
+      send(res, 200, { runs });
       return;
     }
 
@@ -63,6 +77,27 @@ const server = http.createServer(async (req, res) => {
       } catch (err: unknown) {
         if (err instanceof CapacityError) {
           send(res, 429, { error: "too many concurrent runs" });
+          return;
+        }
+        throw err;
+      }
+      return;
+    }
+
+    const cancelMatch = url.pathname.match(/^\/v1\/runs\/([^/]+)\/cancel$/);
+    if (req.method === "POST" && cancelMatch) {
+      const id = cancelMatch[1];
+      if (!isRunId(id)) {
+        send(res, 400, { error: "invalid run id" });
+        return;
+      }
+      try {
+        const run = await runner.cancel(id);
+        send(res, 200, { id: run.id, status: run.status });
+      } catch (err: unknown) {
+        if (err instanceof CancelNotAllowedError) {
+          const status = err.message === "run not found" ? 404 : 409;
+          send(res, status, { error: err.message });
           return;
         }
         throw err;
@@ -106,6 +141,7 @@ server.listen(port, () => {
   console.log(
     `orchestrator listening on :${port} provider=${llmConfig.provider} ` +
       `base=${llmConfig.baseUrl} model=${llmConfig.model} ` +
+      `timeoutMs=${llmConfig.timeoutMs} maxRetries=${llmConfig.maxRetries} ` +
       `maxConcurrent=${maxConcurrent} data=${dataDir}`,
   );
 });

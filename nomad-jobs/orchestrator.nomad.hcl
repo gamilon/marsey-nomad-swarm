@@ -43,6 +43,8 @@ job "orchestrator" {
         # Docker bridge gateway to the host where Ollama listens (see lab/ollama/README.md).
         LLM_BASE_URL = "http://172.17.0.1:11434"
         LLM_MODEL    = "llama3.1:8b"
+        LLM_TIMEOUT_MS      = "120000"
+        LLM_MAX_RETRIES     = "1"
         MAX_CONCURRENT_RUNS = "2"
       }
 

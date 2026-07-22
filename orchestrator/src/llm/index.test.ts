@@ -9,6 +9,8 @@ describe("resolveLlmConfig", () => {
       provider: "ollama",
       baseUrl: "http://127.0.0.1:11434",
       model: "llama3.1:8b",
+      timeoutMs: 120_000,
+      maxRetries: 1,
     });
   });
 
@@ -18,6 +20,8 @@ describe("resolveLlmConfig", () => {
         LLM_PROVIDER: "ollama",
         LLM_BASE_URL: "http://llm:11434",
         LLM_MODEL: "mistral",
+        LLM_TIMEOUT_MS: "30000",
+        LLM_MAX_RETRIES: "2",
         OLLAMA_HOST: "http://ignored:1",
         OLLAMA_MODEL: "ignored",
       }),
@@ -25,6 +29,8 @@ describe("resolveLlmConfig", () => {
         provider: "ollama",
         baseUrl: "http://llm:11434",
         model: "mistral",
+        timeoutMs: 30_000,
+        maxRetries: 2,
       },
     );
   });
@@ -39,6 +45,8 @@ describe("resolveLlmConfig", () => {
         provider: "ollama",
         baseUrl: "http://172.17.0.1:11434",
         model: "llama3.1:8b",
+        timeoutMs: 120_000,
+        maxRetries: 1,
       },
     );
   });
@@ -50,6 +58,8 @@ describe("createLlmClient", () => {
       provider: "ollama",
       baseUrl: "http://127.0.0.1:11434",
       model: "llama3.1:8b",
+      timeoutMs: 120_000,
+      maxRetries: 1,
     });
     assert.ok(client instanceof OllamaClient);
     assert.equal(client.modelId, "llama3.1:8b");
@@ -62,6 +72,8 @@ describe("createLlmClient", () => {
           provider: "openai",
           baseUrl: "https://api.openai.com",
           model: "gpt-4o",
+          timeoutMs: 120_000,
+          maxRetries: 0,
         }),
       /Unsupported LLM_PROVIDER/,
     );
