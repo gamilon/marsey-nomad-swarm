@@ -26,11 +26,20 @@ Domain-specific behavior (coding, research, ops, …) is added later via prompts
 │       └── orchestrator job (Docker)                     │
 │             POST /v1/runs  GET /v1/runs/:id             │
 │             GET /livez  GET /readyz (/health)           │
+│             alloc logs → /opt/nomad/data/alloc/.../logs │
+│                                                         │
+│  Alloy (systemd)                                        │
+│       ├── nomad-logs  (alloc files)                     │
+│       ├── ollama-logs (journald ollama.service)         │
+│       └── nomad-ops   (journald nomad.service)          │
+│                 │                                       │
+│                 └──► Loki :3100 (e.g. 192.168.0.100)    │
 └─────────────────────────────────────────────────────────┘
 ```
 
 - **Ollama** runs on the **host** (not a Nomad job) for simple device/model/memory handling.
 - **Orchestrator** is a Nomad `service` job using the Docker driver; it calls the LLM at `LLM_BASE_URL` (aliases: `OLLAMA_HOST`), typically `http://172.17.0.1:11434` on the lab Docker bridge.
+- **Alloy** runs on the **host** and ships alloc + journal logs to Loki. See [`lab/alloy/`](../lab/alloy/).
 
 ## LLM providers
 
@@ -81,6 +90,8 @@ Every log line is one JSON object on stdout/stderr (Nomad alloc logs). Schema:
 
 Example: `nomad alloc logs <id> | jq -c 'select(.event=="run.phase")'`
 
+With Alloy → Loki ([`lab/alloy/`](../lab/alloy/)): `{job="nomad-logs", nomad_task="orchestrator", event="run.phase"}`.
+
 ## Security notes (current)
 
 | Area | Status |
@@ -121,5 +132,6 @@ See [`nomad-jobs/README.md`](../nomad-jobs/README.md).
 
 - Lab Nomad: [`lab/nomad/`](../lab/nomad/)
 - Host Ollama: [`lab/ollama/`](../lab/ollama/)
+- Host Alloy → Loki: [`lab/alloy/`](../lab/alloy/)
 - Orchestrator app: [`orchestrator/`](../orchestrator/)
 - Nomad job: [`nomad-jobs/orchestrator.nomad.hcl`](../nomad-jobs/orchestrator.nomad.hcl)
