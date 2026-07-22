@@ -8,7 +8,8 @@ Agent swarm control plane. **Lab path:** bare-metal Nomad CE + host Ollama. Arti
 |------|---------|
 | [`lab/nomad/`](lab/nomad/) | Local Nomad CE config, systemd unit, ACL policies |
 | [`lab/ollama/`](lab/ollama/) | Host Ollama install and Docker→host wiring |
-| [`lab/alloy/`](lab/alloy/) | Host Alloy → Loki (`nomad-logs`, `ollama-logs`, `nomad-ops`) |
+| [`lab/observability/`](lab/observability/) | Loki + Grafana + Prometheus + Alloy (Compose, TLS) |
+| [`lab/alloy/`](lab/alloy/) | Legacy host Alloy unit (prefer observability Compose) |
 | [`orchestrator/`](orchestrator/) | TypeScript control plane (planner → workers via `LlmClient`) |
 | [`nomad-jobs/`](nomad-jobs/) | Orchestrator jobspec + optional `swarm` namespace/ACLs |
 | [`docs/architecture.md`](docs/architecture.md) | Roles, API, security roadmap, provider env |
@@ -19,7 +20,7 @@ Agent swarm control plane. **Lab path:** bare-metal Nomad CE + host Ollama. Arti
 1. Install Nomad — [`lab/nomad/README.md`](lab/nomad/README.md)
 2. Install Ollama — [`lab/ollama/README.md`](lab/ollama/README.md)
 3. Build & run orchestrator — [`nomad-jobs/README.md`](nomad-jobs/README.md) or `./scripts/deploy.sh`
-4. Optional: ship logs to Loki — [`lab/alloy/README.md`](lab/alloy/README.md)
+4. Optional: observability stack — [`lab/observability/README.md`](lab/observability/README.md)
 
 ## CI
 
