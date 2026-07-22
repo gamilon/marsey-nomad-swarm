@@ -41,6 +41,8 @@ The runner depends on a provider-agnostic `LlmClient` (`chat`, `healthy`, `model
 | `LLM_PROVIDER` | Provider id (default `ollama`) |
 | `LLM_BASE_URL` | Backend base URL |
 | `LLM_MODEL` | Model name |
+| `LLM_TIMEOUT_MS` | Per-request LLM timeout (default `120000`) |
+| `LLM_MAX_RETRIES` | Retries after transient LLM failures (default `1`; timeouts/cancels are not retried) |
 | `OLLAMA_HOST` / `OLLAMA_MODEL` | Deprecated aliases for base URL / model |
 | `MAX_CONCURRENT_RUNS` | In-process concurrency cap (default `2`; excess `POST /v1/runs` → `429`) |
 
@@ -49,11 +51,15 @@ Only the Ollama adapter is implemented today; add adapters behind `createLlmClie
 ## API (phase 1)
 
 - `GET /livez` — process liveness (Nomad health check; no auth)
-- `GET /readyz` or `GET /health` — LLM readiness (`200` / `503`)
+- `GET /readyz` or `GET /health` — LLM readiness (`200` / `503`) plus `activeRuns` / `maxConcurrentRuns`
+- `GET /v1/runs?limit=50` — newest-first run summaries (truncated goal)
 - `POST /v1/runs` — body `{ "goal": string, "metadata"?: object }` → `202 { "id", "status" }`
 - `GET /v1/runs/:id` — status, plan tasks, worker handoffs
+- `POST /v1/runs/:id/cancel` — cancel `pending` / `planning` / `working` → `cancelled` (`409` if terminal)
 
-Request bodies are size-limited; run ids must be UUIDs. The API is **unauthenticated** today — trusted network / lab LAN only.
+Statuses: `pending` → `planning` → `working` → `completed` | `failed` | `cancelled`.
+
+Request bodies are size-limited; run ids must be UUIDs. The API is **unauthenticated** today — trusted network / lab LAN only. Alloc logs emit one JSON line per phase (`runId`, `phase`, optional `taskId`) without goal/handoff bodies.
 
 ## Security notes (current)
 

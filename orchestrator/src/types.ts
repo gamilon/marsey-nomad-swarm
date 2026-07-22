@@ -1,4 +1,10 @@
-export type RunStatus = "pending" | "planning" | "working" | "completed" | "failed";
+export type RunStatus =
+  | "pending"
+  | "planning"
+  | "working"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 export interface Task {
   id: string;
@@ -21,4 +27,12 @@ export interface Run {
   plan: Task[];
   handoffs: Handoff[];
   error?: string;
+}
+
+export interface RunSummary {
+  id: string;
+  status: RunStatus;
+  createdAt: string;
+  updatedAt: string;
+  goal: string;
 }

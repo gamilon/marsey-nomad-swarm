@@ -60,9 +60,12 @@ curl -s http://HOST:PORT/readyz
 curl -s -X POST http://HOST:PORT/v1/runs \
   -H 'content-type: application/json' \
   -d '{"goal":"List three reasons to run models on-prem"}'
+curl -s http://HOST:PORT/v1/runs
+curl -s http://HOST:PORT/v1/runs/<id>
+# optional: curl -s -X POST http://HOST:PORT/v1/runs/<id>/cancel
 ```
 
-Nomad checks `/livez` (process up). Use `/readyz` (or `/health`) to see LLM connectivity. If readiness is degraded, check Ollama listen address and `172.17.0.1:11434` from a test container (see lab/ollama README).
+Nomad checks `/livez` (process up). Use `/readyz` (or `/health`) for LLM connectivity and `activeRuns` / `maxConcurrentRuns`. If readiness is degraded, check Ollama listen address and `172.17.0.1:11434` from a test container (see lab/ollama README).
 
 ## Optional: `swarm` namespace + ACLs
 

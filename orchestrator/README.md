@@ -19,7 +19,9 @@ curl -s localhost:8080/readyz
 curl -s -X POST localhost:8080/v1/runs \
   -H 'content-type: application/json' \
   -d '{"goal":"Summarize three benefits of local LLMs"}'
+curl -s localhost:8080/v1/runs
 curl -s localhost:8080/v1/runs/<id>
+curl -s -X POST localhost:8080/v1/runs/<id>/cancel
 ```
 
 ## Tests / build
@@ -38,6 +40,8 @@ npm run build
 | `LLM_PROVIDER` | `ollama` | Only `ollama` implemented |
 | `LLM_BASE_URL` | `http://127.0.0.1:11434` | Prefer over `OLLAMA_HOST` |
 | `LLM_MODEL` | `llama3.1:8b` | Prefer over `OLLAMA_MODEL` |
+| `LLM_TIMEOUT_MS` | `120000` | Per LLM request timeout |
+| `LLM_MAX_RETRIES` | `1` | Transient failure retries |
 | `OLLAMA_HOST` / `OLLAMA_MODEL` | — | Aliases for base URL / model |
 | `MAX_CONCURRENT_RUNS` | `2` | In-flight runs; excess → `429` |
 

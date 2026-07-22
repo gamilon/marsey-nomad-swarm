@@ -1,7 +1,9 @@
 import { mkdir, readFile, writeFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { isRunId } from "./ids.js";
-import type { Run } from "./types.js";
+import type { Run, RunSummary } from "./types.js";
+
+const DEFAULT_LIST_LIMIT = 50;
 
 export class RunStore {
   constructor(private readonly dir: string) {}
@@ -46,4 +48,31 @@ export class RunStore {
       .map((n) => n.replace(/\.json$/, ""))
       .filter(isRunId);
   }
+
+  /** Newest-first summaries; goal truncated for list views. */
+  async listSummaries(limit: number = DEFAULT_LIST_LIMIT): Promise<RunSummary[]> {
+    const ids = await this.listIds();
+    const runs: Run[] = [];
+    for (const id of ids) {
+      const run = await this.get(id);
+      if (run) {
+        runs.push(run);
+      }
+    }
+    runs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return runs.slice(0, Math.max(0, limit)).map((run) => ({
+      id: run.id,
+      status: run.status,
+      createdAt: run.createdAt,
+      updatedAt: run.updatedAt,
+      goal: truncate(run.goal, 120),
+    }));
+  }
+}
+
+function truncate(text: string, max: number): string {
+  if (text.length <= max) {
+    return text;
+  }
+  return `${text.slice(0, max - 1)}…`;
 }
