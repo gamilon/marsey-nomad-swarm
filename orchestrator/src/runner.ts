@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { extractJson } from "./json.js";
 import { LlmAbortedError, LlmTimeoutError } from "./llm/ollama.js";
 import type { LlmClient } from "./llm/types.js";
-import { logEvent } from "./log.js";
+import { logInfo } from "./log.js";
 import type { RunStore } from "./store.js";
 import type { Handoff, Run, Task } from "./types.js";
 
@@ -84,7 +84,7 @@ export class Runner {
 
     try {
       await this.store.save(run);
-      logEvent({ runId: run.id, phase: "pending" });
+      logInfo("run.phase", { runId: run.id, phase: "pending" });
     } catch (err) {
       this.controllers.delete(run.id);
       this.active -= 1;
@@ -123,7 +123,7 @@ export class Runner {
       }
       return latest ?? run;
     }
-    logEvent({ runId: id, phase: "cancelled" });
+    logInfo("run.phase", { runId: id, phase: "cancelled" });
     return run;
   }
 
@@ -141,7 +141,7 @@ export class Runner {
       run.status = "planning";
       run.updatedAt = now();
       await this.saveIfActive(run, signal);
-      logEvent({ runId: id, phase: "planning" });
+      logInfo("run.phase", { runId: id, phase: "planning" });
 
       const planRaw = await this.llm.chat(
         [
@@ -170,12 +170,16 @@ export class Runner {
       run.status = "working";
       run.updatedAt = now();
       await this.saveIfActive(run, signal);
-      logEvent({ runId: id, phase: "working", taskCount: tasks.length });
+      logInfo("run.phase", {
+        runId: id,
+        phase: "working",
+        taskCount: tasks.length,
+      });
 
       const handoffs: Handoff[] = [];
       for (const task of tasks) {
         await this.ensureActive(id, signal);
-        logEvent({ runId: id, phase: "working", taskId: task.id });
+        logInfo("run.phase", { runId: id, phase: "working", taskId: task.id });
         const workerRaw = await this.llm.chat(
           [
             {
@@ -211,7 +215,7 @@ export class Runner {
       run.status = "completed";
       run.updatedAt = now();
       await this.saveIfActive(run, signal);
-      logEvent({ runId: id, phase: "completed" });
+      logInfo("run.phase", { runId: id, phase: "completed" });
     } catch (err: unknown) {
       const latest = (await this.store.get(id)) ?? run;
       if (isCancelError(err, signal, latest.status)) {
@@ -220,7 +224,7 @@ export class Runner {
           latest.error = "cancelled by client";
           latest.updatedAt = now();
           await this.store.save(latest);
-          logEvent({ runId: id, phase: "cancelled" });
+          logInfo("run.phase", { runId: id, phase: "cancelled" });
         }
         return;
       }
@@ -235,7 +239,11 @@ export class Runner {
       latest.error = message;
       latest.updatedAt = now();
       await this.store.save(latest);
-      logEvent({ runId: id, phase: "failed", error: message.slice(0, 200) });
+      logInfo("run.phase", {
+        runId: id,
+        phase: "failed",
+        error: message.slice(0, 200),
+      });
     }
   }
 

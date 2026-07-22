@@ -44,6 +44,9 @@ npm run build
 | `LLM_MAX_RETRIES` | `1` | Transient failure retries |
 | `OLLAMA_HOST` / `OLLAMA_MODEL` | — | Aliases for base URL / model |
 | `MAX_CONCURRENT_RUNS` | `2` | In-flight runs; excess → `429` |
+| `LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
+
+Logs are JSON lines (`ts`, `level`, `event`, …). See [`docs/architecture.md`](../docs/architecture.md).
 
 ## Docker image (build on the Nomad host)
 

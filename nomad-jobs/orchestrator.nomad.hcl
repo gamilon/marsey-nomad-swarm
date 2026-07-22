@@ -47,6 +47,7 @@ job "orchestrator" {
         LLM_TIMEOUT_MS      = "120000"
         LLM_MAX_RETRIES     = "1"
         MAX_CONCURRENT_RUNS = "2"
+        LOG_LEVEL           = "info"
       }
 
       resources {
