@@ -15,10 +15,15 @@ export class LlmAbortedError extends Error {
 }
 
 function isAbortError(err: unknown): boolean {
-  return (
-    (err instanceof Error && err.name === "AbortError") ||
-    err instanceof LlmAbortedError
-  );
+  if (err instanceof LlmAbortedError) {
+    return true;
+  }
+  if (err instanceof Error && err.name === "AbortError") {
+    return true;
+  }
+  // Node fetch sometimes wraps aborts as TypeError with an AbortError cause.
+  const cause = err instanceof Error ? err.cause : undefined;
+  return cause instanceof Error && cause.name === "AbortError";
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
