@@ -104,6 +104,7 @@ Reserve the bootstrap token for ACL changes only.
 - HTTP and RPC are TLS; `verify_https_client` is off so you do not need a client cert for the UI.
 - If hostname verification fails, confirm DNS/`/etc/hosts` for `nomad.marsey.tel` and that the cert SAN is `*.marsey.tel` (wildcards do not cover a bare IP).
 - Service runs as `User=nomad` / `Group=nomad`; data dir, config, and TLS files must be readable by that user.
+- `telemetry {}` publishes Prometheus metrics (node + allocation). Scraped by [`lab/observability/`](../observability/) — see that README for the metrics ACL token.
 - Host volume `orchestrator_runs` is declared for the swarm orchestrator job; create the path before restarting:
 
 ```bash
@@ -111,4 +112,4 @@ sudo mkdir -p /opt/nomad/host_volumes/orchestrator_runs
 sudo chown -R 1000:1000 /opt/nomad/host_volumes/orchestrator_runs
 ```
 
-See also [lab/ollama](../ollama/) and [nomad-jobs](../../nomad-jobs/).
+See also [lab/ollama](../ollama/), [lab/observability](../observability/), and [nomad-jobs](../../nomad-jobs/).

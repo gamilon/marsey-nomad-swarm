@@ -1,4 +1,12 @@
-# Lab Alloy (host log shipper → Loki)
+# Lab Alloy (host log shipper → Loki) — **legacy**
+
+> **Preferred path:** Compose Alloy inside [`lab/observability/`](../observability/) (TLS stack, tenant `marsey`). Disable this host unit when using the Compose stack:
+>
+> ```bash
+> sudo systemctl disable --now alloy
+> ```
+>
+> Keep these files only if you need a bare-metal Alloy outside Compose.
 
 Runs **Grafana Alloy on the bare-metal lab host** under systemd — same pattern as [Nomad](../nomad/) and [Ollama](../ollama/). One agent, three pipelines:
 
@@ -8,13 +16,19 @@ Runs **Grafana Alloy on the bare-metal lab host** under systemd — same pattern
 | `ollama-logs` | journald `_SYSTEMD_UNIT=ollama.service` |
 | `nomad-ops` | journald `_SYSTEMD_UNIT=nomad.service` |
 
-No Loki auth. Default push URL: `http://192.168.0.100:3100/loki/api/v1/push`.
+If you still use this unit against the observability stack, set tenant and URL to match:
+
+```env
+LOKI_URL=https://loki.marsey.tel/loki/api/v1/push
+```
+
+and configure Alloy `loki.write` with `tenant_id = "marsey"` plus basic auth (edge credentials). The Compose Alloy config already does the right thing over the internal gateway.
 
 ## Prerequisites
 
 - Nomad lab installed ([lab/nomad](../nomad/)) so alloc logs exist under `/opt/nomad/data`
 - Ollama optional but expected for `ollama-logs` ([lab/ollama](../ollama/))
-- Loki reachable at the URL in `alloy.env` (lab: `192.168.0.100:3100`)
+- Prefer [`lab/observability/`](../observability/) instead of this host unit
 
 ## Install Alloy package
 

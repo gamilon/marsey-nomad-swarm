@@ -1,0 +1,47 @@
+---
+# Lab Prometheus. Nomad token is injected at container start from NOMAD_TOKEN
+# into bearer_token_file (see docker-compose entrypoint).
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: alloy
+    static_configs:
+      - targets: ["alloy:12345"]
+
+  - job_name: loki-read
+    static_configs:
+      - targets: ["read:3100"]
+
+  - job_name: loki-write
+    static_configs:
+      - targets: ["write:3100"]
+
+  - job_name: loki-backend
+    static_configs:
+      - targets: ["backend:3100"]
+
+  - job_name: minio
+    metrics_path: /minio/v2/metrics/cluster
+    static_configs:
+      - targets: ["minio:9000"]
+
+  - job_name: nomad
+    scheme: https
+    metrics_path: /v1/metrics
+    params:
+      format: ["prometheus"]
+    bearer_token_file: /etc/prometheus/nomad_token
+    tls_config:
+      ca_file: /etc/prometheus/certs/ca.pem
+      server_name: nomad.marsey.tel
+    static_configs:
+      - targets: ["nomad.marsey.tel:4646"]
+        labels:
+          datacenter: lab

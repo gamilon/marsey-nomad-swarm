@@ -1,0 +1,124 @@
+// Lab Alloy (Compose): Nomad alloc logs + Ollama/Nomad journald → Loki tenant marsey.
+
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+loki.write "default" {
+  endpoint {
+    url       = "http://gateway:3100/loki/api/v1/push"
+    tenant_id = "marsey"
+  }
+}
+
+// ---------------------------------------------------------------------------
+// nomad-logs — alloc stdout/stderr on disk
+// Path: /opt/nomad/data/alloc/<alloc_id>/alloc/logs/<task>.stdout.<n>
+// ---------------------------------------------------------------------------
+
+local.file_match "nomad_logs" {
+  path_targets = [
+    {
+      __path__         = "/opt/nomad/data/alloc/*/alloc/logs/*.{stdout,stderr}.*",
+      __path_exclude__ = "/opt/nomad/data/alloc/**/*.fifo",
+      job              = "nomad-logs",
+      datacenter       = "lab",
+    },
+  ]
+  sync_period = "10s"
+}
+
+discovery.relabel "nomad_logs" {
+  targets = local.file_match.nomad_logs.targets
+
+  rule {
+    source_labels = ["__path__"]
+    regex         = "/opt/nomad/data/alloc/([^/]+)/alloc/logs/.*"
+    target_label  = "nomad_alloc"
+  }
+
+  rule {
+    source_labels = ["__path__"]
+    regex         = ".*/alloc/logs/([^.]+)\\.(stdout|stderr)\\..*"
+    target_label  = "nomad_task"
+  }
+
+  rule {
+    source_labels = ["__path__"]
+    regex         = ".*/alloc/logs/[^.]+\\.(stdout|stderr)\\..*"
+    target_label  = "stream"
+  }
+}
+
+loki.source.file "nomad_logs" {
+  targets       = discovery.relabel.nomad_logs.output
+  forward_to    = [loki.process.nomad_logs.receiver]
+  tail_from_end = true
+}
+
+loki.process "nomad_logs" {
+  forward_to = [loki.write.default.receiver]
+
+  // Orchestrator (and similar) emit one JSON object per line.
+  // Only promote low-cardinality fields to labels.
+  stage.json {
+    expressions = {
+      level = "level",
+      event = "event",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level = "",
+      event = "",
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ollama-logs — ollama.service journald
+// ---------------------------------------------------------------------------
+
+loki.relabel "ollama_logs" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
+}
+
+loki.source.journal "ollama_logs" {
+  matches       = "_SYSTEMD_UNIT=ollama.service"
+  forward_to    = [loki.write.default.receiver]
+  relabel_rules = loki.relabel.ollama_logs.rules
+  labels = {
+    job        = "ollama-logs",
+    datacenter = "lab",
+  }
+}
+
+// ---------------------------------------------------------------------------
+// nomad-ops — nomad.service journald (agent operational logs)
+// ---------------------------------------------------------------------------
+
+loki.relabel "nomad_ops" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
+}
+
+loki.source.journal "nomad_ops" {
+  matches       = "_SYSTEMD_UNIT=nomad.service"
+  forward_to    = [loki.write.default.receiver]
+  relabel_rules = loki.relabel.nomad_ops.rules
+  labels = {
+    job        = "nomad-ops",
+    datacenter = "lab",
+  }
+}
