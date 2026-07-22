@@ -1,0 +1,23 @@
+[Unit]
+Description=Grafana Alloy (lab log shipper → Loki)
+Documentation=https://grafana.com/docs/alloy/latest/
+Wants=network-online.target
+After=network-online.target nomad.service
+
+[Service]
+Type=simple
+User=alloy
+Group=alloy
+# Read Nomad alloc logs + systemd journal (ollama / nomad units)
+SupplementaryGroups=nomad systemd-journal
+EnvironmentFile=/etc/alloy/alloy.env
+ExecStart=/usr/bin/alloy run /etc/alloy/config.alloy \
+  --storage.path=/var/lib/alloy/data \
+  --server.http.listen-addr=127.0.0.1:12345
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
